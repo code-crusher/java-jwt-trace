@@ -114,6 +114,20 @@ See the [examples](./EXAMPLES.md) and [JavaDocs](https://javadoc.io/doc/com.auth
 
 - [java-jwt JavaDocs](https://javadoc.io/doc/com.auth0/java-jwt/latest)
 
+## Verifying release signatures
+
+Releases are signed with the key published on [keys.openpgp.org](https://keys.openpgp.org). Dependency
+verification tools such as `pgpverify-maven-plugin` fetch the key from that keyserver automatically.
+To verify an artifact manually, look up the signing key ID from the `.asc` file and import it:
+
+```shell
+gpg --keyserver hkps://keys.openpgp.org --recv-keys <KEY_ID>
+gpg --verify java-jwt-<VERSION>.jar.asc java-jwt-<VERSION>.jar
+```
+
+The signing key ID used for a release is the one reported in the verification error, and is also
+printed by `gpg --list-packets java-jwt-<VERSION>.jar.asc`.
+
 ## Feedback
 
 ### Contributing

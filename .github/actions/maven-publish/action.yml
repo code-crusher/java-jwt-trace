@@ -33,6 +33,14 @@ runs:
       env:
         JAVA_HOME: ${{ env.JAVA_HOME }}
 
+    # Users verify the published signatures with tools that fetch the public key
+    # from keys.openpgp.org, so the key must be there before the artifacts are.
+    - name: Publish signing key to keyservers
+      shell: bash
+      run: ./.github/scripts/publish-signing-key.sh
+      env:
+        SIGNING_KEY: ${{ inputs.signing-key }}
+
     - name: Publish Java Packages to Maven
       shell: bash
       run: ./gradlew publishToSonatype closeSonatypeStagingRepository -PisSnapshot=false --stacktrace
