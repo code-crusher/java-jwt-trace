@@ -2,8 +2,7 @@ package com.auth0.jwt.impl;
 
 import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.Payload;
-import com.fasterxml.jackson.core.ObjectCodec;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 
 import java.io.Serializable;
 import java.time.Instant;
@@ -34,7 +33,6 @@ class PayloadImpl implements Payload, Serializable {
     private final Instant issuedAt;
     private final String jwtId;
     private final Map<String, JsonNode> tree;
-    private final ObjectCodec objectCodec;
 
     PayloadImpl(
             String issuer,
@@ -44,8 +42,7 @@ class PayloadImpl implements Payload, Serializable {
             Instant notBefore,
             Instant issuedAt,
             String jwtId,
-            Map<String, JsonNode> tree,
-            ObjectCodec objectCodec
+            Map<String, JsonNode> tree
     ) {
         this.issuer = issuer;
         this.subject = subject;
@@ -55,7 +52,6 @@ class PayloadImpl implements Payload, Serializable {
         this.issuedAt = issuedAt;
         this.jwtId = jwtId;
         this.tree = tree != null ? Collections.unmodifiableMap(tree) : Collections.emptyMap();
-        this.objectCodec = objectCodec;
     }
 
     Map<String, JsonNode> getTree() {
@@ -115,14 +111,14 @@ class PayloadImpl implements Payload, Serializable {
 
     @Override
     public Claim getClaim(String name) {
-        return extractClaim(name, tree, objectCodec);
+        return extractClaim(name, tree);
     }
 
     @Override
     public Map<String, Claim> getClaims() {
         Map<String, Claim> claims = new HashMap<>(tree.size() * 2);
         for (String name : tree.keySet()) {
-            claims.put(name, extractClaim(name, tree, objectCodec));
+            claims.put(name, extractClaim(name, tree));
         }
         return Collections.unmodifiableMap(claims);
     }

@@ -2,8 +2,7 @@ package com.auth0.jwt.impl;
 
 import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.Header;
-import com.fasterxml.jackson.core.ObjectCodec;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 
 import java.io.Serializable;
 import java.util.Collections;
@@ -22,22 +21,19 @@ class BasicHeader implements Header, Serializable {
     private final String contentType;
     private final String keyId;
     private final Map<String, JsonNode> tree;
-    private final ObjectCodec objectCodec;
 
     BasicHeader(
             String algorithm,
             String type,
             String contentType,
             String keyId,
-            Map<String, JsonNode> tree,
-            ObjectCodec objectCodec
+            Map<String, JsonNode> tree
     ) {
         this.algorithm = algorithm;
         this.type = type;
         this.contentType = contentType;
         this.keyId = keyId;
         this.tree = tree == null ? Collections.emptyMap() : Collections.unmodifiableMap(tree);
-        this.objectCodec = objectCodec;
     }
 
     Map<String, JsonNode> getTree() {
@@ -66,6 +62,6 @@ class BasicHeader implements Header, Serializable {
 
     @Override
     public Claim getHeaderClaim(String name) {
-        return extractClaim(name, tree, objectCodec);
+        return extractClaim(name, tree);
     }
 }

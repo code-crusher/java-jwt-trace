@@ -3,15 +3,13 @@ package com.auth0.jwt.impl;
 import com.auth0.jwt.RegisteredClaims;
 import com.auth0.jwt.exceptions.JWTDecodeException;
 import com.auth0.jwt.interfaces.Payload;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.ObjectCodec;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.deser.std.StdDeserializer;
 
-import java.io.IOException;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.*;
@@ -30,8 +28,8 @@ class PayloadDeserializer extends StdDeserializer<Payload> {
     }
 
     @Override
-    public Payload deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
-        Map<String, JsonNode> tree = p.getCodec().readValue(p, new TypeReference<Map<String, JsonNode>>() {
+    public Payload deserialize(JsonParser p, DeserializationContext ctxt) throws JacksonException {
+        Map<String, JsonNode> tree = ctxt.readValue(p, new TypeReference<Map<String, JsonNode>>() {
         });
         if (tree == null) {
             throw new JWTDecodeException("Parsing the Payload's JSON resulted on a Null map");
@@ -39,30 +37,30 @@ class PayloadDeserializer extends StdDeserializer<Payload> {
 
         String issuer = getString(tree, RegisteredClaims.ISSUER);
         String subject = getString(tree, RegisteredClaims.SUBJECT);
-        List<String> audience = getStringOrArray(p.getCodec(), tree, RegisteredClaims.AUDIENCE);
+        List<String> audience = getStringOrArray(ctxt, tree, RegisteredClaims.AUDIENCE);
         Instant expiresAt = getInstantFromSeconds(tree, RegisteredClaims.EXPIRES_AT);
         Instant notBefore = getInstantFromSeconds(tree, RegisteredClaims.NOT_BEFORE);
         Instant issuedAt = getInstantFromSeconds(tree, RegisteredClaims.ISSUED_AT);
         String jwtId = getString(tree, RegisteredClaims.JWT_ID);
 
-        return new PayloadImpl(issuer, subject, audience, expiresAt, notBefore, issuedAt, jwtId, tree, p.getCodec());
+        return new PayloadImpl(issuer, subject, audience, expiresAt, notBefore, issuedAt, jwtId, tree);
     }
 
-    List<String> getStringOrArray(ObjectCodec codec, Map<String, JsonNode> tree, String claimName)
+    List<String> getStringOrArray(DeserializationContext ctxt, Map<String, JsonNode> tree, String claimName)
             throws JWTDecodeException {
         JsonNode node = tree.get(claimName);
-        if (node == null || node.isNull() || !(node.isArray() || node.isTextual())) {
+        if (node == null || node.isNull() || !(node.isArray() || node.isString())) {
             return null;
         }
-        if (node.isTextual()) {
-            return Collections.singletonList(node.asText());
+        if (node.isString()) {
+            return Collections.singletonList(node.asString());
         }
 
         List<String> list = new ArrayList<>(node.size());
         for (int i = 0; i < node.size(); i++) {
             try {
-                list.add(codec.treeToValue(node.get(i), String.class));
-            } catch (JsonProcessingException e) {
+                list.add(ctxt.readTreeAsValue(node.get(i), String.class));
+            } catch (JacksonException e) {
                 throw new JWTDecodeException("Couldn't map the Claim's array contents to String", e);
             }
         }
@@ -86,7 +84,7 @@ class PayloadDeserializer extends StdDeserializer<Payload> {
         if (!node.canConvertToLong()) {
             throw new JWTDecodeException(String.format(
                     "The claim '%s' value (%s) is out of the range representable as a NumericDate.",
-                    claimName, node.asText()));
+                    claimName, node.asString()));
         }
         long epochSecond = node.asLong();
         try {
@@ -103,6 +101,7 @@ class PayloadDeserializer extends StdDeserializer<Payload> {
         if (node == null || node.isNull()) {
             return null;
         }
-        return node.asText(null);
+        // An empty default reproduces Jackson 2's asText(null): containers coerce to "".
+        return node.asString("");
     }
 }

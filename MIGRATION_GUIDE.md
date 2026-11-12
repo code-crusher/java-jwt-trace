@@ -1,5 +1,24 @@
 # Migration Guide
 
+## Upgrading from v4.x -> v5.0
+
+Version 5 upgrades the library's JSON processing from Jackson 2 to [Jackson 3](https://github.com/FasterXML/jackson/wiki/Jackson-Release-3.0), which fixes the `NoClassDefFoundError: com/fasterxml/jackson/databind/json/JsonMapper` failure that occurred when only Jackson 3 was present on the classpath ([#730](https://github.com/auth0/java-jwt/issues/730)).
+
+### Requirements
+
+- **Java 17 or later is required.** Jackson 3 is compiled for Java 17, so the previous Java 8 and 11 support has been dropped. Java 17 and 21 are the supported LTS versions.
+- The library now depends on `tools.jackson.core:jackson-core` and `tools.jackson.core:jackson-databind` (Jackson 3) instead of the `com.fasterxml.jackson.core` artifacts. If you declared a Jackson dependency yourself, update it to Jackson 3, or simply remove it and let this library bring in the version it was built and tested against.
+
+### Compile or runtime breaking changes
+
+- **Jackson is no longer exposed through the public API.** The public API never accepted a Jackson `ObjectMapper`, and this remains the case; Jackson is now an internal implementation detail. If you were catching Jackson 2 exception types (such as `com.fasterxml.jackson.core.JsonProcessingException`) around calls into this library, note that Jackson 3 uses the unchecked `tools.jackson.core.JacksonException` instead. Decoding and validation problems are still reported as the library's own `JWTDecodeException` and `JWTVerificationException` types, so most callers need no changes.
+
+### Behavioral potentially breaking changes
+
+- **`DecodedJWT`, `Header` and `Payload` no longer carry a Jackson codec.** They remain `java.io.Serializable`, and serializing and deserializing them works as before: the JSON tree and the claims are preserved. Jackson is now purely an internal implementation detail, so no Jackson type is retained on these instances and no Jackson type needs to be serializable.
+- **No change to the tokens produced by `JWT.create()`.** The library has always sorted properties alphabetically and serializes claim values itself, so the JSON it writes is byte-for-byte the same as before. Jackson 3 sorts POJO properties alphabetically by default, which matches the existing configuration, so POJO values written into a header map are also unchanged.
+- **`JsonNode` trees built from a POJO are ordered alphabetically.** When a POJO is converted to a `JsonNode` (for example through the default mapper), its properties now appear in alphabetical order rather than declaration order. This only affects the string form of such a tree, not the values it contains.
+
 ## Upgrading from v3.x -> v4.0
 
 The version 4 release contains several improvements:

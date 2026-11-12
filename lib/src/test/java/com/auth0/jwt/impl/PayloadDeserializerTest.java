@@ -2,27 +2,26 @@ package com.auth0.jwt.impl;
 
 import com.auth0.jwt.exceptions.JWTDecodeException;
 import com.auth0.jwt.interfaces.Payload;
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.ObjectCodec;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.*;
 import org.hamcrest.collection.IsCollectionWithSize;
 import org.hamcrest.core.IsIterableContaining;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.*;
 
 import java.io.StringReader;
 import java.time.Instant;
 import java.util.*;
 
-import static org.hamcrest.Matchers.*;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
+import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -43,18 +42,15 @@ public class PayloadDeserializerTest {
     }
 
     @Test
-    public void shouldThrowOnNullTree() throws Exception {
-        exception.expect(JWTDecodeException.class);
-        exception.expectMessage("Parsing the Payload's JSON resulted on a Null map");
-
+    public void shouldThrowOnNullTree() {
         JsonParser parser = mock(JsonParser.class);
-        ObjectCodec codec = mock(ObjectCodec.class);
         DeserializationContext context = mock(DeserializationContext.class);
 
-        when(codec.readValue(eq(parser), any(TypeReference.class))).thenReturn(null);
-        when(parser.getCodec()).thenReturn(codec);
+        when(context.readValue(eq(parser), any(TypeReference.class))).thenReturn(null);
 
-        deserializer.deserialize(parser, context);
+        JWTDecodeException exception = assertThrows(JWTDecodeException.class,
+                () -> deserializer.deserialize(parser, context));
+        assertThat(exception.getMessage(), containsString("Parsing the Payload's JSON resulted on a Null map"));
     }
 
     @Test
@@ -70,7 +66,7 @@ public class PayloadDeserializerTest {
         ArrayNode arrNode = new ArrayNode(JsonNodeFactory.instance, subNodes);
         tree.put("key", arrNode);
 
-        deserializer.getStringOrArray(objectMapper, tree, "key");
+        deserializer.getStringOrArray(objectMapper._deserializationContext(), tree, "key");
     }
 
     @Test
@@ -86,11 +82,10 @@ public class PayloadDeserializerTest {
                 "  \"roles\":\"admin\" \n" +
                 "}";
         StringReader reader = new StringReader(payloadJSON);
-        JsonParser jsonParser = new JsonFactory().createParser(reader);
         ObjectMapper mapper = new ObjectMapper();
-        jsonParser.setCodec(mapper);
+        JsonParser jsonParser = mapper.createParser(reader);
 
-        Payload payload = deserializer.deserialize(jsonParser, mapper.getDeserializationContext());
+        Payload payload = deserializer.deserialize(jsonParser, mapper._deserializationContext());
 
         assertThat(payload, is(notNullValue()));
         assertThat(payload.getIssuer(), is("auth0"));
@@ -118,38 +113,38 @@ public class PayloadDeserializerTest {
     public void shouldGetStringArrayWhenParsingArrayNode() {
         Map<String, JsonNode> tree = new HashMap<>();
         List<JsonNode> subNodes = new ArrayList<>();
-        TextNode textNode1 = new TextNode("one");
-        TextNode textNode2 = new TextNode("two");
+        StringNode textNode1 = new StringNode("one");
+        StringNode textNode2 = new StringNode("two");
         subNodes.add(textNode1);
         subNodes.add(textNode2);
         ArrayNode arrNode = new ArrayNode(JsonNodeFactory.instance, subNodes);
         tree.put("key", arrNode);
 
-        List<String> values = deserializer.getStringOrArray(objectMapper, tree, "key");
+        List<String> values = deserializer.getStringOrArray(objectMapper._deserializationContext(), tree, "key");
         assertThat(values, is(notNullValue()));
         assertThat(values, is(IsCollectionWithSize.hasSize(2)));
         assertThat(values, is(IsIterableContaining.hasItems("one", "two")));
     }
 
     @Test
-    public void shouldGetStringArrayWhenParsingTextNode() {
+    public void shouldGetStringArrayWhenParsingStringNode() {
         Map<String, JsonNode> tree = new HashMap<>();
-        TextNode textNode = new TextNode("something");
+        StringNode textNode = new StringNode("something");
         tree.put("key", textNode);
 
-        List<String> values = deserializer.getStringOrArray(objectMapper, tree, "key");
+        List<String> values = deserializer.getStringOrArray(objectMapper._deserializationContext(), tree, "key");
         assertThat(values, is(notNullValue()));
         assertThat(values, is(IsCollectionWithSize.hasSize(1)));
         assertThat(values, is(IsIterableContaining.hasItems("something")));
     }
 
     @Test
-    public void shouldGetEmptyStringInArrayWhenParsingEmptyTextNode() {
+    public void shouldGetEmptyStringInArrayWhenParsingEmptyStringNode() {
         Map<String, JsonNode> tree = new HashMap<>();
-        TextNode textNode = new TextNode("");
+        StringNode textNode = new StringNode("");
         tree.put("key", textNode);
 
-        List<String> values = deserializer.getStringOrArray(objectMapper, tree, "key");
+        List<String> values = deserializer.getStringOrArray(objectMapper._deserializationContext(), tree, "key");
         assertThat(values, is(notNullValue()));
         assertThat(values, is(IsIterableContaining.hasItem("")));
     }
@@ -160,7 +155,7 @@ public class PayloadDeserializerTest {
         NullNode node = NullNode.getInstance();
         tree.put("key", node);
 
-        List<String> values = deserializer.getStringOrArray(objectMapper, tree, "key");
+        List<String> values = deserializer.getStringOrArray(objectMapper._deserializationContext(), tree, "key");
         assertThat(values, is(nullValue()));
     }
 
@@ -169,17 +164,17 @@ public class PayloadDeserializerTest {
         Map<String, JsonNode> tree = new HashMap<>();
         tree.put("key", null);
 
-        List<String> values = deserializer.getStringOrArray(objectMapper, tree, "key");
+        List<String> values = deserializer.getStringOrArray(objectMapper._deserializationContext(), tree, "key");
         assertThat(values, is(nullValue()));
     }
 
     @Test
-    public void shouldGetNullArrayWhenParsingNonArrayOrTextNode() {
+    public void shouldGetNullArrayWhenParsingNonArrayOrStringNode() {
         Map<String, JsonNode> tree = new HashMap<>();
         IntNode node = new IntNode(456789);
         tree.put("key", node);
 
-        List<String> values = deserializer.getStringOrArray(objectMapper, tree, "key");
+        List<String> values = deserializer.getStringOrArray(objectMapper._deserializationContext(), tree, "key");
         assertThat(values, is(nullValue()));
     }
 
@@ -208,7 +203,7 @@ public class PayloadDeserializerTest {
         exception.expectMessage("The claim 'key' contained a non-numeric date value.");
 
         Map<String, JsonNode> tree = new HashMap<>();
-        TextNode node = new TextNode("123456789");
+        StringNode node = new StringNode("123456789");
         tree.put("key", node);
 
         deserializer.getInstantFromSeconds(tree, "key");
@@ -315,14 +310,23 @@ public class PayloadDeserializerTest {
     }
 
     @Test
-    public void shouldGetStringWhenParsingTextNode() {
+    public void shouldGetStringWhenParsingStringNode() {
         Map<String, JsonNode> tree = new HashMap<>();
-        TextNode node = new TextNode("something here");
+        StringNode node = new StringNode("something here");
         tree.put("key", node);
 
         String text = deserializer.getString(tree, "key");
         assertThat(text, is(notNullValue()));
         assertThat(text, is("something here"));
+    }
+
+    @Test
+    public void shouldGetStringWhenParsingNonStringNode() {
+        Map<String, JsonNode> tree = new HashMap<>();
+        tree.put("key", new ObjectNode(JsonNodeFactory.instance));
+
+        String text = deserializer.getString(tree, "key");
+        assertThat(text, is(""));
     }
 
 }

@@ -3,22 +3,19 @@ package com.auth0.jwt.impl;
 import com.auth0.jwt.UserPojo;
 import com.auth0.jwt.exceptions.JWTDecodeException;
 import com.auth0.jwt.interfaces.Claim;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.JsonNodeType;
-import com.fasterxml.jackson.databind.node.MissingNode;
-import com.fasterxml.jackson.databind.node.NullNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.hamcrest.collection.IsMapContaining;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.mockito.ArgumentMatchers;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.MissingNode;
+import tools.jackson.databind.node.NullNode;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,7 +36,6 @@ import static org.hamcrest.core.IsNull.notNullValue;
 import static org.hamcrest.core.IsNull.nullValue;
 import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 public class JsonNodeClaimTest {
@@ -64,7 +60,7 @@ public class JsonNodeClaimTest {
     }
 
     private Claim claimFromNode(JsonNode value) {
-        return JsonNodeClaim.claimFromNode(value, mapper);
+        return JsonNodeClaim.claimFromNode(value);
     }
 
     @Test
@@ -312,21 +308,17 @@ public class JsonNodeClaimTest {
     }
 
     @Test
-    public void shouldThrowIfAnExtraordinaryExceptionHappensWhenParsingAsGenericMap() throws Exception {
-        JsonNode value = mock(ObjectNode.class);
-        when(value.getNodeType()).thenReturn(JsonNodeType.OBJECT);
+    public void shouldThrowIfAnExtraordinaryExceptionHappensWhenParsingAsGenericMap() {
+        JsonNode value = mapper.valueToTree(Collections.singletonMap("key", "value"));
 
         ObjectMapper mockedMapper = mock(ObjectMapper.class);
+        when(mockedMapper.convertValue(ArgumentMatchers.eq(value), ArgumentMatchers.<TypeReference<?>>any()))
+                .thenThrow(mock(JacksonException.class));
 
-        JsonNodeClaim claim = (JsonNodeClaim) JsonNodeClaim.claimFromNode(value, mockedMapper);
-        JsonNodeClaim spiedClaim = spy(claim);
-        
-        JsonParser mockedParser = mock(JsonParser.class);
-        when(mockedMapper.treeAsTokens(value)).thenReturn(mockedParser);
-        when(mockedParser.readValueAs(ArgumentMatchers.any(TypeReference.class))).thenThrow(IOException.class);
+        Claim claim = JsonNodeClaim.claimFromNode(value, mockedMapper);
 
         exception.expect(JWTDecodeException.class);
-        spiedClaim.asMap();
+        claim.asMap();
     }
 
     @Test
@@ -548,7 +540,7 @@ public class JsonNodeClaimTest {
         Claim nullClaim = claimFromNode(nullValue);
         Claim missingClaim = claimFromNode(missingValue);
 
-        assertThat(claim.toString(), is("{\"name\":\"john\",\"id\":123}"));
+        assertThat(claim.toString(), is("{\"id\":123,\"name\":\"john\"}"));
         assertThat(nullClaim.isNull(), is(true));
         assertThat(nullClaim.toString(), is("Null claim"));
         assertThat(missingClaim.isMissing(), is(true));

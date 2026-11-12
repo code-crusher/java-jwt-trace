@@ -19,6 +19,7 @@ import java.util.Date;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.junit.Assert.assertThrows;
 
 public class JWTTest {
 
@@ -519,5 +520,24 @@ public class JWTTest {
         JWTVerifier verified = JWT.require(Algorithm.ECDSA512((ECKey) PemUtils.readPublicKeyFromFile(PUBLIC_KEY_FILE_EC_512, "EC")))
                 .build();
         assertThat(verified, is(notNullValue()));
+    }
+
+    // Issue #730: Jackson is an internal implementation detail, and only Jackson 3 must be required at runtime.
+    @Test
+    public void shouldCreateAndDecodeATokenWithOnlyJackson3OnTheClasspath() {
+        assertThrows(ClassNotFoundException.class, () -> Class.forName("com.fasterxml.jackson.databind.ObjectMapper"));
+        assertThrows(ClassNotFoundException.class, () -> Class.forName("com.fasterxml.jackson.core.JsonProcessingException"));
+
+        String token = JWT.create()
+                .withIssuer("auth0")
+                .withClaim("name", "john")
+                .sign(Algorithm.HMAC256("secret"));
+
+        DecodedJWT decoded = JWT.decode(token);
+        assertThat(decoded.getIssuer(), is("auth0"));
+        assertThat(decoded.getClaim("name").asString(), is("john"));
+
+        JWTVerifier verifier = JWT.require(Algorithm.HMAC256("secret")).build();
+        assertThat(verifier.verify(token).getIssuer(), is("auth0"));
     }
 }
